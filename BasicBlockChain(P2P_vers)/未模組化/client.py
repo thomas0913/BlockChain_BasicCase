@@ -1,3 +1,13 @@
+"""
+---操作指南---
+    開啟終端機:
+        1.運行節點端: Python .\blockchain_server.py 1111
+        2.運行使用者端: Python .\blockchain_client.py 1111
+        3.創建新地址: 輸入1
+        4.查詢餘額: 輸入2
+        5.發起交易: 輸入3，輸入發送者公私鑰，輸入接收者公鑰，輸入金額、手續費
+"""
+
 # -*- coding: utf-8 -*-
 from inspect import signature
 import pickle
@@ -9,11 +19,6 @@ import time
 import rsa
 
 
-def handle_receive():
-    while True:
-        response = client.recv(4096)
-        if response:
-            print(f"[*] Message from node: {response}")
 
 #交易定義
 class Transaction:
@@ -78,12 +83,25 @@ def sign_transaction(transaction, private):
         'utf-8'), private_key_pkcs, 'SHA-1')  # 簽章
     return signature
 
+def handle_receive():
+    while True:
+        response = client.recv(4096) #接收的資料為 4 Byte
+        if response:
+            print(f"[*] Message from node: {response}")
+
+"""
+客戶端功能:
+    1.產生公私鑰(錢包地址)
+    2.向節點詢問帳戶餘額
+    3.發起並簽署交易，並傳送到結點端，等待礦工確認與上鏈
+"""
 if __name__ == "__main__":
-    target_host = "127.0.0.1"
-    target_post = int(sys.argv[1])
+    target_host = "192.168.1.105" #本地IP位置
+    target_post = int(sys.argv[1]) #本地客戶阜
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client.connect((target_host, target_post))
 
+    #開啟一執行緒，隨時接收來自socket的訊息
     receive_handler = threading.Thread(target=handle_receive, args=())
     receive_handler.start()
 
@@ -117,10 +135,12 @@ if __name__ == "__main__":
 
         elif command_dict[str(command)] == "transaction":
             address = input("Address: ")
+
             private_key = input("Private_key: ")
             receiver = input("Receiver: ")
             amount = input("Amount: ")
             fee = input("Fee: ")
+
             comment = input("Comment: ")
             new_transaction = initialize_transaction(
                 address, receiver, int(amount), int(fee), comment

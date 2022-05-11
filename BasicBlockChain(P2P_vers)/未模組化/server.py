@@ -1,14 +1,17 @@
 import hashlib
+import time
+import rsa
+
 import imp
 import pickle
-from re import T
-import socket
+import socket #stream socket type
 import sys
 import threading
-import time
-from urllib import response
 
-import rsa
+#從套件中匯入模組
+from urllib import response
+from re import T
+
 
 
 #交易定義
@@ -43,9 +46,9 @@ class BlockChain:
         self.pending_transactions = []  # 等待中的交易(因區塊鏈能吞吐的交易量有限)
 
         #For P2P connection
-        self.socket_host = "127.0.0.1"
-        self.socket_port = int(sys.argv[1])
-        self.start_socket_server()
+        self.socket_host = "192.168.1.105" #本機 IP 位置做為端口
+        self.socket_port = int(sys.argv[1]) #本機節點阜
+        self.start_socket_server() #開始服務端之socket運作
 
     # 開始部屬區塊鏈所產生之第一個區塊，無任何交易紀錄且為無任何資料的空區塊
     def create_genesis_block(self):
@@ -256,33 +259,47 @@ class BlockChain:
             self.mine_block(address)
             self.adjust_difficulty()
 
+    """
+    節點功能:
+        1.產生公私鑰(錢包地址)
+        2.儲存交易紀錄
+        3.確認帳戶餘額
+        4.驗證交易上面的數位簽章
+        5.打包交易並挖掘新區塊
+    """
     def start_socket_server(self):
-        t = threading.Thread(target=self.wait_for_socket_connection)
-        t.start()
+        t = threading.Thread(target = self.wait_for_socket_connection)
+        t.start() #執行主socket執行緒
 
     def wait_for_socket_connection(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind((self.socket_host, self.socket_port))
-            s.listen()
-            while True:
+            s.bind((self.socket_host, self.socket_port)) #連線狀態:bind(盲)
+            s.listen() #連線狀態:listen(監聽)
+            while True:  #當有新連線連入時
                 conn, address = s.accept()
 
+                #再開一執行緒，接收外界訊息
                 client_handler = threading.Thread(
                     target=self.receive_socket_message,
                     args=(conn, address)
                 )
-                client_handler.start()
+                client_handler.start() ##執行監聽執行緒
 
+    """
+        ==> 根據使用者傳遞的資料，判別使用者想要做:
+                1.取得帳戶餘額
+                2.發起交易
+    """
     def receive_socket_message(self, connection, address):
         with connection:
             print(f'Connection by: {address}')
             while True:
-                message = connection.recv(1024)
+                message = connection.recv(1024) #接收的資料為 1 Byte
                 print(f"[*] Received: {message}")
                 try:
                     parsed_message = pickle.loads(message)
                 except Exception:
-                    print(f"{message} connot be parsed")
+                    print(f"{message} cannot be parsed")
                 if message:
                     if parsed_message["request"] == "get_balance":
                         print("Start to get the balance for client...")
@@ -307,6 +324,7 @@ class BlockChain:
                         response = {
                             "message": "Unknown command."
                         }
+                    #將 字串資料 打包成 位元組封包
                     response_bytes = str(response).encode('utf8')
                     connection.sendall(response_bytes)
 
